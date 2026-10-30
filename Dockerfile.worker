@@ -1,0 +1,41 @@
+# VION — Standalone Node.js + Remotion + FFmpeg Render Worker Dockerfile
+# Includes Chromium headless dependencies, Arabic/English fonts, and FFmpeg/FFprobe.
+FROM node:22-bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    fonts-noto-core \
+    fonts-noto-color-emoji \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Pre-download Remotion Chrome Headless Shell during image build
+RUN npx remotion browser ensure
+
+COPY . .
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+CMD ["npx", "tsx", "server.ts"]

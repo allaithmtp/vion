@@ -1,0 +1,557 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile isolated to the owner or authorized admins.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Immutable Firebase Auth UID of the user.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile avatar URL.",
+          "maxLength": 1024
+        },
+        "preferredLocale": {
+          "type": "string",
+          "enum": ["en", "ar"],
+          "description": "Preferred UI language.",
+          "maxLength": 8
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": ["uid", "email", "displayName", "preferredLocale", "createdAt", "updatedAt"]
+    },
+    "ProjectRecord": {
+      "title": "ProjectRecord",
+      "description": "A user-owned VION video editing or voiceover motion graphics project.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Project document ID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerUid": {
+          "type": "string",
+          "description": "Immutable UID of the user who owns this project.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Project title visible in header and sidebar.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "workflowMode": {
+          "type": "string",
+          "enum": ["unselected", "video-edit", "voiceover-motion"],
+          "description": "Active editing workflow mode.",
+          "maxLength": 32
+        },
+        "selectedModelId": {
+          "type": "string",
+          "description": "Selected Brain engine ID.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-\\.]+$"
+        },
+        "selectedStyleId": {
+          "type": "string",
+          "enum": [
+            "clean-cut-studio",
+            "kinetic-explainer",
+            "minimal-documentary",
+            "high-retention-social"
+          ],
+          "description": "Selected visual style preset ID.",
+          "maxLength": 64
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether the project is archived."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last modification."
+        }
+      },
+      "required": [
+        "id",
+        "ownerUid",
+        "name",
+        "workflowMode",
+        "selectedModelId",
+        "selectedStyleId",
+        "archived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProjectMessage": {
+      "title": "ProjectMessage",
+      "description": "A chat message inside a project conversation subcollection.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Message document ID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Parent project ID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerUid": {
+          "type": "string",
+          "description": "Owner UID matching the parent project owner.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "brain-system"],
+          "description": "Message sender role.",
+          "maxLength": 32
+        },
+        "content": {
+          "type": "string",
+          "description": "Message text content in original user language.",
+          "maxLength": 8000
+        },
+        "systemNoticeKey": {
+          "type": "string",
+          "description": "Optional i18n key for system notices.",
+          "maxLength": 120
+        },
+        "selectedModelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-\\.]+$"
+        },
+        "modelVersion": {
+          "type": "number",
+          "description": "Published Brain model version used for this message."
+        },
+        "rulesVersion": {
+          "type": "number",
+          "description": "Published Brain rules version used for this message."
+        },
+        "selectedStyleId": {
+          "type": "string",
+          "enum": [
+            "clean-cut-studio",
+            "kinetic-explainer",
+            "minimal-documentary",
+            "high-retention-social"
+          ],
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of message creation."
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "ownerUid",
+        "role",
+        "content",
+        "selectedModelId",
+        "selectedStyleId",
+        "createdAt"
+      ]
+    },
+    "ProjectAsset": {
+      "title": "ProjectAsset",
+      "description": "Source metadata, FFprobe extraction, derived files, and processing status for a private project media asset.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "projectId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["raw-video", "voiceover-audio", "b-roll", "brand-graphic"],
+          "maxLength": 32
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fileSizeBytes": {
+          "type": "number"
+        },
+        "storagePath": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "processingState": {
+          "type": "string",
+          "enum": [
+            "uploading",
+            "paused",
+            "canceled",
+            "queued",
+            "probing",
+            "generating-thumbnail",
+            "normalizing-proxy",
+            "ready",
+            "failed"
+          ],
+          "maxLength": 32
+        },
+        "containerFormat": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "videoCodec": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "audioCodec": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["landscape", "portrait", "square"],
+          "maxLength": 32
+        },
+        "rotationDegrees": {
+          "type": "number"
+        },
+        "fps": {
+          "type": "number"
+        },
+        "isVariableFrameRate": {
+          "type": "boolean"
+        },
+        "hasAudioTrack": {
+          "type": "boolean"
+        },
+        "audioTracksCount": {
+          "type": "number"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10
+        },
+        "thumbnailPath": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "previewProxyPath": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "normalizedAudioPath": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "sourceDurationSec": {
+          "type": "number"
+        },
+        "normalizedDurationSec": {
+          "type": "number"
+        },
+        "targetCfrFps": {
+          "type": "number"
+        },
+        "rotationAppliedDegrees": {
+          "type": "number"
+        },
+        "timeScaleRatio": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "ownerUid",
+        "kind",
+        "fileName",
+        "mimeType",
+        "fileSizeBytes",
+        "storagePath",
+        "processingState",
+        "createdAt"
+      ]
+    },
+    "AdminMember": {
+      "title": "AdminMember",
+      "description": "Server-managed RBAC record binding a verified Google user UID to specific admin permissions.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "inviteId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "isPrimaryOwner": {
+          "type": "boolean"
+        },
+        "canEditRules": {
+          "type": "boolean"
+        },
+        "canPublishModels": {
+          "type": "boolean"
+        },
+        "canMonitorOperations": {
+          "type": "boolean"
+        },
+        "canManageAccess": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "isPrimaryOwner",
+        "canEditRules",
+        "canPublishModels",
+        "canMonitorOperations",
+        "canManageAccess",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminInvite": {
+      "title": "AdminInvite",
+      "description": "Pending or bound email-based admin invitation created by an admin with canManageAccess.",
+      "type": "object",
+      "properties": {
+        "inviteId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "boundUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "isPrimaryOwner": {
+          "type": "boolean"
+        },
+        "canEditRules": {
+          "type": "boolean"
+        },
+        "canPublishModels": {
+          "type": "boolean"
+        },
+        "canMonitorOperations": {
+          "type": "boolean"
+        },
+        "canManageAccess": {
+          "type": "boolean"
+        },
+        "createdByUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdByEmail": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "inviteId",
+        "email",
+        "isPrimaryOwner",
+        "canEditRules",
+        "canPublishModels",
+        "canMonitorOperations",
+        "canManageAccess",
+        "createdByUid",
+        "createdByEmail",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable audit log entry recording administrative changes with actor and timestamp.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorEmail": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "action": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "targetEmail": {
+          "type": "string",
+          "maxLength": 254
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "actorUid",
+        "actorEmail",
+        "action",
+        "targetEmail",
+        "details",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user account profiles."
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ProjectRecord" },
+      "description": "User-owned video editing projects."
+    },
+    "/projects/{projectId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ProjectMessage" },
+      "description": "Conversation messages belonging to a specific project."
+    },
+    "/projects/{projectId}/assets/{assetId}": {
+      "schema": { "$ref": "#/entities/ProjectAsset" },
+      "description": "Private media asset metadata, FFprobe extraction, and derived proxy paths belonging to a specific project."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminMember" },
+      "description": "UID-bound admin permissions registry."
+    },
+    "/admin_invites/{inviteId}": {
+      "schema": { "$ref": "#/entities/AdminInvite" },
+      "description": "Email-based admin invitations managed by admins with canManageAccess."
+    },
+    "/admin_audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Immutable audit trail of admin actions."
+    }
+  }
+}

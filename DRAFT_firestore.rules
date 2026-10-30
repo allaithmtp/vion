@@ -1,0 +1,598 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // 0. Global Safety Net (Default Deny)
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // 1. Hardened Global Primitives
+    // =========================================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isGoogleProvider() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isPrimaryOwnerEmail() {
+      return isGoogleProvider() && request.auth.token.email == 'allaithmtp@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isPrimaryOwnerEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function canManageAccess() {
+      return isSignedIn() && (
+        isPrimaryOwnerEmail() ||
+        (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.canManageAccess == true
+        )
+      );
+    }
+
+    // =========================================================================
+    // 2. Entity Validation Blueprints (Anti-Update-Gap)
+    // =========================================================================
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'preferredLocale', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'preferredLocale', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == request.auth.uid &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024)) &&
+        data.preferredLocale is string && (data.preferredLocale == 'en' || data.preferredLocale == 'ar') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProjectRecord(data) {
+      return data.keys().hasAll([
+          'id',
+          'ownerUid',
+          'name',
+          'workflowMode',
+          'selectedModelId',
+          'selectedStyleId',
+          'archived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id',
+          'ownerUid',
+          'name',
+          'workflowMode',
+          'selectedModelId',
+          'selectedStyleId',
+          'archived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == request.auth.uid &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+        data.workflowMode is string && (
+          data.workflowMode == 'unselected' ||
+          data.workflowMode == 'video-edit' ||
+          data.workflowMode == 'voiceover-motion'
+        ) &&
+        data.selectedModelId is string && data.selectedModelId == 'brain-1.8' &&
+        data.selectedStyleId is string && (
+          data.selectedStyleId == 'clean-cut-studio' ||
+          data.selectedStyleId == 'kinetic-explainer' ||
+          data.selectedStyleId == 'minimal-documentary' ||
+          data.selectedStyleId == 'high-retention-social'
+        ) &&
+        data.archived is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProjectMessage(data) {
+      return data.keys().hasAll([
+          'id',
+          'projectId',
+          'ownerUid',
+          'role',
+          'content',
+          'selectedModelId',
+          'selectedStyleId',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id',
+          'projectId',
+          'ownerUid',
+          'role',
+          'content',
+          'systemNoticeKey',
+          'selectedModelId',
+          'selectedStyleId',
+          'createdAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.projectId) &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == request.auth.uid &&
+        data.role is string && (data.role == 'user' || data.role == 'brain-system') &&
+        data.content is string && data.content.size() <= 8000 &&
+        (!('systemNoticeKey' in data) || (data.systemNoticeKey is string && data.systemNoticeKey.size() <= 120)) &&
+        data.selectedModelId is string && data.selectedModelId == 'brain-1.8' &&
+        data.selectedStyleId is string && (
+          data.selectedStyleId == 'clean-cut-studio' ||
+          data.selectedStyleId == 'kinetic-explainer' ||
+          data.selectedStyleId == 'minimal-documentary' ||
+          data.selectedStyleId == 'high-retention-social'
+        ) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidProjectAsset(data) {
+      return data.keys().hasAll([
+          'id',
+          'projectId',
+          'ownerUid',
+          'kind',
+          'fileName',
+          'mimeType',
+          'fileSizeBytes',
+          'storagePath',
+          'processingState',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id',
+          'projectId',
+          'ownerUid',
+          'kind',
+          'fileName',
+          'mimeType',
+          'fileSizeBytes',
+          'storagePath',
+          'processingState',
+          'containerFormat',
+          'videoCodec',
+          'audioCodec',
+          'durationSeconds',
+          'width',
+          'height',
+          'orientation',
+          'rotationDegrees',
+          'fps',
+          'isVariableFrameRate',
+          'hasAudioTrack',
+          'audioTracksCount',
+          'warnings',
+          'thumbnailPath',
+          'previewProxyPath',
+          'normalizedAudioPath',
+          'sourceDurationSec',
+          'normalizedDurationSec',
+          'targetCfrFps',
+          'rotationAppliedDegrees',
+          'timeScaleRatio',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.projectId) &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == request.auth.uid &&
+        data.kind is string && (
+          data.kind == 'raw-video' ||
+          data.kind == 'voiceover-audio' ||
+          data.kind == 'b-roll' ||
+          data.kind == 'brand-graphic'
+        ) &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255 &&
+        data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 128 &&
+        data.fileSizeBytes is number && data.fileSizeBytes >= 0 && data.fileSizeBytes <= 10737418240 &&
+        data.storagePath is string && data.storagePath.size() >= 1 && data.storagePath.size() <= 512 &&
+        data.processingState is string && (
+          data.processingState == 'uploading' ||
+          data.processingState == 'paused' ||
+          data.processingState == 'canceled' ||
+          data.processingState == 'queued' ||
+          data.processingState == 'probing' ||
+          data.processingState == 'generating-thumbnail' ||
+          data.processingState == 'normalizing-proxy' ||
+          data.processingState == 'ready' ||
+          data.processingState == 'failed'
+        ) &&
+        (!('containerFormat' in data) || (data.containerFormat is string && data.containerFormat.size() <= 64)) &&
+        (!('videoCodec' in data) || (data.videoCodec is string && data.videoCodec.size() <= 64)) &&
+        (!('audioCodec' in data) || (data.audioCodec is string && data.audioCodec.size() <= 64)) &&
+        (!('durationSeconds' in data) || (data.durationSeconds is number && data.durationSeconds >= 0)) &&
+        (!('width' in data) || (data.width is number && data.width >= 0)) &&
+        (!('height' in data) || (data.height is number && data.height >= 0)) &&
+        (!('orientation' in data) || (
+          data.orientation is string && (
+            data.orientation == 'landscape' ||
+            data.orientation == 'portrait' ||
+            data.orientation == 'square'
+          )
+        )) &&
+        (!('rotationDegrees' in data) || data.rotationDegrees is number) &&
+        (!('fps' in data) || (data.fps is number && data.fps >= 0)) &&
+        (!('isVariableFrameRate' in data) || data.isVariableFrameRate is bool) &&
+        (!('hasAudioTrack' in data) || data.hasAudioTrack is bool) &&
+        (!('audioTracksCount' in data) || (data.audioTracksCount is number && data.audioTracksCount >= 0)) &&
+        (!('warnings' in data) || (data.warnings is list && data.warnings.size() <= 10)) &&
+        (!('thumbnailPath' in data) || (data.thumbnailPath is string && data.thumbnailPath.size() <= 512)) &&
+        (!('previewProxyPath' in data) || (data.previewProxyPath is string && data.previewProxyPath.size() <= 512)) &&
+        (!('normalizedAudioPath' in data) || (data.normalizedAudioPath is string && data.normalizedAudioPath.size() <= 512)) &&
+        (!('sourceDurationSec' in data) || (data.sourceDurationSec is number && data.sourceDurationSec >= 0)) &&
+        (!('normalizedDurationSec' in data) || (data.normalizedDurationSec is number && data.normalizedDurationSec >= 0)) &&
+        (!('targetCfrFps' in data) || (data.targetCfrFps is number && data.targetCfrFps >= 0)) &&
+        (!('rotationAppliedDegrees' in data) || data.rotationAppliedDegrees is number) &&
+        (!('timeScaleRatio' in data) || (data.timeScaleRatio is number && data.timeScaleRatio > 0)) &&
+        data.createdAt is timestamp &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidAdminMember(data) {
+      return data.keys().hasAll([
+          'uid',
+          'email',
+          'isPrimaryOwner',
+          'canEditRules',
+          'canPublishModels',
+          'canMonitorOperations',
+          'canManageAccess',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid',
+          'email',
+          'inviteId',
+          'isPrimaryOwner',
+          'canEditRules',
+          'canPublishModels',
+          'canMonitorOperations',
+          'canManageAccess',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        (!('inviteId' in data) || isValidId(data.inviteId)) &&
+        data.isPrimaryOwner is bool &&
+        data.canEditRules is bool &&
+        data.canPublishModels is bool &&
+        data.canMonitorOperations is bool &&
+        data.canManageAccess is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminInvite(data) {
+      return data.keys().hasAll([
+          'inviteId',
+          'email',
+          'isPrimaryOwner',
+          'canEditRules',
+          'canPublishModels',
+          'canMonitorOperations',
+          'canManageAccess',
+          'createdByUid',
+          'createdByEmail',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'inviteId',
+          'email',
+          'boundUid',
+          'isPrimaryOwner',
+          'canEditRules',
+          'canPublishModels',
+          'canMonitorOperations',
+          'canManageAccess',
+          'createdByUid',
+          'createdByEmail',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.inviteId) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        (!('boundUid' in data) || (data.boundUid is string && data.boundUid.size() <= 128)) &&
+        data.isPrimaryOwner is bool &&
+        data.canEditRules is bool &&
+        data.canPublishModels is bool &&
+        data.canMonitorOperations is bool &&
+        data.canManageAccess is bool &&
+        isValidId(data.createdByUid) &&
+        data.createdByEmail is string && data.createdByEmail.size() >= 3 && data.createdByEmail.size() <= 254 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminAuditLog(data) {
+      return data.keys().hasAll([
+          'id',
+          'actorUid',
+          'actorEmail',
+          'action',
+          'targetEmail',
+          'details',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id',
+          'actorUid',
+          'actorEmail',
+          'action',
+          'targetEmail',
+          'details',
+          'createdAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.actorUid) &&
+        data.actorUid == request.auth.uid &&
+        data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 254 &&
+        data.action is string && data.action.size() >= 1 && data.action.size() <= 120 &&
+        data.targetEmail is string && data.targetEmail.size() <= 254 &&
+        data.details is string && data.details.size() <= 1000 &&
+        data.createdAt is timestamp;
+    }
+
+    // =========================================================================
+    // 3. Collection Match Blocks
+    // =========================================================================
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        request.auth.uid == userId &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'preferredLocale', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /projects/{projectId} {
+      allow get: if isSignedIn() && isValidId(projectId) && existing().ownerUid == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerUid == request.auth.uid;
+      allow create: if isSignedIn() &&
+        isValidId(projectId) &&
+        isValidProjectRecord(incoming()) &&
+        incoming().id == projectId &&
+        incoming().ownerUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(projectId) &&
+        isValidProjectRecord(incoming()) &&
+        existing().ownerUid == request.auth.uid &&
+        incoming().id == existing().id &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name',
+          'workflowMode',
+          'selectedModelId',
+          'selectedStyleId',
+          'archived',
+          'updatedAt'
+        ]);
+      allow delete: if isSignedIn() && isValidId(projectId) && existing().ownerUid == request.auth.uid;
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(messageId) &&
+          existing().ownerUid == request.auth.uid &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow list: if isSignedIn() && existing().ownerUid == request.auth.uid;
+        allow create: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(messageId) &&
+          isValidProjectMessage(incoming()) &&
+          incoming().id == messageId &&
+          incoming().projectId == projectId &&
+          incoming().ownerUid == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/projects/$(projectId)) &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(messageId) &&
+          existing().ownerUid == request.auth.uid &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+      }
+
+      match /assets/{assetId} {
+        allow get: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(assetId) &&
+          existing().ownerUid == request.auth.uid &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow list: if isSignedIn() && existing().ownerUid == request.auth.uid;
+        allow create: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(assetId) &&
+          isValidProjectAsset(incoming()) &&
+          incoming().id == assetId &&
+          incoming().projectId == projectId &&
+          incoming().ownerUid == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/projects/$(projectId)) &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow update: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(assetId) &&
+          isValidProjectAsset(incoming()) &&
+          existing().ownerUid == request.auth.uid &&
+          incoming().id == existing().id &&
+          incoming().projectId == existing().projectId &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().createdAt == existing().createdAt &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow delete: if isSignedIn() &&
+          isValidId(projectId) &&
+          isValidId(assetId) &&
+          existing().ownerUid == request.auth.uid &&
+          get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+      }
+    }
+
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && isValidId(adminUid) && (request.auth.uid == adminUid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() &&
+        isValidId(adminUid) &&
+        isValidAdminMember(incoming()) &&
+        incoming().uid == adminUid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (request.auth.uid == adminUid && isPrimaryOwnerEmail() && incoming().isPrimaryOwner == true) ||
+          (canManageAccess() && incoming().isPrimaryOwner == false && incoming().email != 'allaithmtp@gmail.com') ||
+          (
+            request.auth.uid == adminUid &&
+            isGoogleProvider() &&
+            incoming().isPrimaryOwner == false &&
+            incoming().email == request.auth.token.email &&
+            'inviteId' in incoming() &&
+            exists(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)) &&
+            get(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)).data.email == request.auth.token.email &&
+            incoming().canEditRules == get(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)).data.canEditRules &&
+            incoming().canPublishModels == get(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)).data.canPublishModels &&
+            incoming().canMonitorOperations == get(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)).data.canMonitorOperations &&
+            incoming().canManageAccess == get(/databases/$(database)/documents/admin_invites/$(incoming().inviteId)).data.canManageAccess
+          )
+        );
+      allow update: if isSignedIn() &&
+        isValidId(adminUid) &&
+        isValidAdminMember(incoming()) &&
+        canManageAccess() &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (existing().isPrimaryOwner == false && incoming().isPrimaryOwner == false && existing().email != 'allaithmtp@gmail.com') ||
+          (isPrimaryOwnerEmail() && request.auth.uid == adminUid && incoming().isPrimaryOwner == true)
+        ) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'canEditRules',
+          'canPublishModels',
+          'canMonitorOperations',
+          'canManageAccess',
+          'updatedAt'
+        ]);
+      allow delete: if isSignedIn() &&
+        isValidId(adminUid) &&
+        canManageAccess() &&
+        existing().isPrimaryOwner == false &&
+        existing().email != 'allaithmtp@gmail.com';
+    }
+
+    match /admin_invites/{inviteId} {
+      allow get: if isSignedIn() &&
+        isValidId(inviteId) &&
+        (isAdmin() || request.auth.token.email == existing().email);
+      allow list: if isSignedIn() && (isAdmin() || existing().email == request.auth.token.email);
+      allow create: if isSignedIn() &&
+        isValidId(inviteId) &&
+        isValidAdminInvite(incoming()) &&
+        canManageAccess() &&
+        incoming().inviteId == inviteId &&
+        incoming().createdByUid == request.auth.uid &&
+        incoming().isPrimaryOwner == false &&
+        incoming().email != 'allaithmtp@gmail.com' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(inviteId) &&
+        isValidAdminInvite(incoming()) &&
+        incoming().inviteId == existing().inviteId &&
+        incoming().email == existing().email &&
+        incoming().isPrimaryOwner == existing().isPrimaryOwner &&
+        incoming().createdByUid == existing().createdByUid &&
+        incoming().createdByEmail == existing().createdByEmail &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (
+            canManageAccess() &&
+            existing().isPrimaryOwner == false &&
+            existing().email != 'allaithmtp@gmail.com' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'canEditRules',
+              'canPublishModels',
+              'canMonitorOperations',
+              'canManageAccess',
+              'boundUid',
+              'updatedAt'
+            ])
+          ) ||
+          (
+            isGoogleProvider() &&
+            request.auth.token.email == existing().email &&
+            incoming().boundUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['boundUid', 'updatedAt'])
+          )
+        );
+      allow delete: if isSignedIn() &&
+        isValidId(inviteId) &&
+        canManageAccess() &&
+        existing().isPrimaryOwner == false &&
+        existing().email != 'allaithmtp@gmail.com';
+    }
+
+    match /admin_audit_logs/{logId} {
+      allow get: if isSignedIn() && isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() &&
+        isValidId(logId) &&
+        isValidAdminAuditLog(incoming()) &&
+        isAdmin() &&
+        incoming().id == logId &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}
